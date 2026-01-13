@@ -30,6 +30,9 @@ pub struct OpenCodeConfig {
 
     #[serde(default)]
     pub command: serde_json::Map<String, serde_json::Value>,
+
+    #[serde(default)]
+    pub mcp: serde_json::Map<String, serde_json::Value>,
 }
 
 pub type ProviderConfigMap = serde_json::Map<String, serde_json::Value>;

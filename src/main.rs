@@ -49,9 +49,25 @@ fn main() -> Result<()> {
             let opencode_path = cli.config.as_ref().map(|p| p.as_path());
             config::validate(&config_dir, opencode_path)
         }
+        cli::Commands::Tree => {
+            let opencode_path = cli.config.as_ref().map(|p| p.as_path());
+            let config = config::load_config(&config_dir, opencode_path)?;
+            let tree = models::build_tree_from_opencode_config(&config);
+            print_tree(&tree, 0);
+            Ok(())
+        }
+        cli::Commands::ShowCurrent => models::show_current_models(),
         cli::Commands::Completions { shell } => {
             generate(shell, &mut cli::Cli::command(), "oc-variance", &mut std::io::stdout());
             Ok(())
         }
+    }
+}
+
+fn print_tree(node: &models::TreeNode, depth: usize) {
+    let indent = "  ".repeat(depth);
+    println!("{}{}", indent, node.name);
+    for child in &node.children {
+        print_tree(child, depth + 1);
     }
 }

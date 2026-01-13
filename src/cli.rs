@@ -38,6 +38,12 @@ pub enum Commands {
     /// Validate opencode.json configuration (uses OC_VARIANCE_CONFIG's opencode_config field)
     Validate,
 
+    /// Show tree representation of opencode.json configuration
+    Tree,
+
+    /// Show currently used models from OpenCode state
+    ShowCurrent,
+
     /// Generate shell completions
     #[command(arg_required_else_help = true)]
     Completions {

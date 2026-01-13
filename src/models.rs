@@ -1,5 +1,5 @@
 use crate::cache::{CacheManager, ModelInfo, ProviderInfo};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -728,6 +728,41 @@ pub fn extract_tree_path(node: &TreeNode) -> Vec<String> {
     path
 }
 
+pub fn build_tree_from_opencode_config(config: &crate::config::OpenCodeConfig) -> TreeNode {
+    let mut root = TreeNode::new(TreeNodeKind::Provider("root".to_string()), "root".to_string());
+    root.expanded = true;
+
+    for (provider_name, provider_config) in &config.provider {
+        let mut provider_node = TreeNode::provider(provider_name.clone(), "".to_string());
+        provider_node.expanded = true;
+
+        if let Some(models) = provider_config.get("models").and_then(|v| v.as_object()) {
+            for (model_name, model_config) in models {
+                let mut model_node = TreeNode::model(model_name.clone(), String::new(), ModelCapabilities {
+                    reasoning: false,
+                    temperature: false,
+                    tool_call: false,
+                });
+                model_node.expanded = true;
+
+                if let Some(variants) = model_config.get("variants").and_then(|v| v.as_object()) {
+                    for (variant_name, variant_config) in variants {
+                        model_node.add_child(TreeNode::variant(variant_name.clone(), variant_config.clone()));
+                    }
+                }
+
+                model_node.add_child(TreeNode::new(TreeNodeKind::Variant("[new variant]".to_string()), "[new variant]".to_string()));
+                provider_node.add_child(model_node);
+            }
+        }
+
+        provider_node.add_child(TreeNode::new(TreeNodeKind::Model("[new model]".to_string()), "[new model]".to_string()));
+        root.add_child(provider_node);
+    }
+
+    root
+}
+
 pub fn fetch_models(_config_dir: &Path, cache_dir: &Path) -> Result<()> {
     let cache_manager = CacheManager::new(cache_dir);
 
@@ -754,4 +789,85 @@ pub fn fetch_models(_config_dir: &Path, cache_dir: &Path) -> Result<()> {
 pub fn get_cached_models(cache_dir: &Path) -> Result<Option<crate::cache::ModelsCache>> {
     let cache_manager = CacheManager::new(cache_dir);
     Ok(cache_manager.load_cached()?)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelRef {
+    #[serde(rename = "providerID")]
+    pub provider_id: String,
+    #[serde(rename = "modelID")]
+    pub model_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenCodeModelState {
+    pub recent: Vec<ModelRef>,
+    pub favorite: Vec<ModelRef>,
+    #[serde(default)]
+    pub variant: HashMap<String, String>,
+}
+
+pub fn show_current_models() -> Result<()> {
+    use directories::ProjectDirs;
+
+    let proj_dirs = ProjectDirs::from("org", "opencode", "opencode")
+        .expect("Failed to determine project directories");
+
+    let state_dir = proj_dirs
+        .state_dir()
+        .expect("Failed to determine state directory");
+    let model_state_path = state_dir.join("model.json");
+
+    if !model_state_path.exists() {
+        println!("No OpenCode model state found at: {}", model_state_path.display());
+        println!("Make sure OpenCode has been run at least once.");
+        return Ok(());
+    }
+
+    let contents = std::fs::read_to_string(&model_state_path)
+        .with_context(|| format!("Failed to read model state from {}", model_state_path.display()))?;
+
+    let state: OpenCodeModelState = serde_json::from_str(&contents)
+        .with_context(|| "Failed to parse OpenCode model state JSON")?;
+
+    println!("OpenCode Current Models\n");
+
+    if !state.recent.is_empty() {
+        println!("\n📋 Recently Used Models:");
+        for (i, model_ref) in state.recent.iter().enumerate() {
+            println!("  {}. {}/{}", i + 1, model_ref.provider_id, model_ref.model_id);
+
+            let model_key = format!("{}/{}", model_ref.provider_id, model_ref.model_id);
+            if let Some(variant) = state.variant.get(&model_key) {
+                println!("     Variant: {}", variant);
+            }
+        }
+    } else {
+        println!("\n📋 No recent models found");
+    }
+
+    if !state.favorite.is_empty() {
+        println!("\n⭐ Favorite Models:");
+        for (i, model_ref) in state.favorite.iter().enumerate() {
+            println!("  {}. {}/{}", i + 1, model_ref.provider_id, model_ref.model_id);
+
+            let model_key = format!("{}/{}", model_ref.provider_id, model_ref.model_id);
+            if let Some(variant) = state.variant.get(&model_key) {
+                println!("     Variant: {}", variant);
+            }
+        }
+    } else {
+        println!("\n⭐ No favorite models set");
+    }
+
+    if !state.variant.is_empty() {
+        println!("\n⚙️  Model Variants ({} configured):", state.variant.len());
+        for (model_key, variant) in state.variant.iter() {
+            println!("  {} → {}", model_key, variant);
+        }
+    }
+
+    println!("\nModel state file: {}", model_state_path.display());
+
+    Ok(())
 }
