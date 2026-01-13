@@ -11,12 +11,12 @@ use clap_complete::Shell;
     author,
 )]
 pub struct Cli {
-    /// Path to opencode.json configuration file
-    #[arg(short = 'C', long, global = true, env = "OPENCODE_CONFIG")]
+    /// Path to opencode.json configuration file to load
+    #[arg(short = 'C', long, global = true, env = "OPENCODE_CONFIG", value_name = "FILE")]
     pub config: Option<std::path::PathBuf>,
 
-    /// Path to cache directory (default: XDG cache directory)
-    #[arg(short, long, global = true, env = "OC_VARIANCE_CACHE")]
+    /// Override cache directory (default: XDG cache directory)
+    #[arg(short, long, global = true, env = "OC_VARIANCE_CACHE", value_name = "DIR")]
     pub cache_dir: Option<std::path::PathBuf>,
 
     /// Increase logging verbosity
@@ -35,7 +35,7 @@ pub enum Commands {
     /// Fetch and cache available models from models.dev
     FetchModels,
 
-    /// Validate current opencode.json configuration
+    /// Validate opencode.json configuration (uses OC_VARIANCE_CONFIG's opencode_config field)
     Validate,
 
     /// Generate shell completions
