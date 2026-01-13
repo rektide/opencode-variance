@@ -70,15 +70,15 @@ oc-variance
 
 **Keyboard Shortcuts:**
 
-| Key | Action |
-|-----|--------|
-| `↑` / `↓` | Navigate up/down in tree |
-| `→` / `Enter` | Toggle expand/collapse on selected node |
-| `[` | Expand selected subtree |
-| `]` | Collapse selected subtree |
-| `Space` | Select node and show in configuration panel |
-| `q` / `ESC` | Quit application |
-| `s` | Save changes (when in editing mode) |
+| Key           | Action                                      |
+| ------------- | ------------------------------------------- |
+| `↑` / `↓`     | Navigate up/down in tree                    |
+| `→` / `Enter` | Toggle expand/collapse on selected node     |
+| `[`           | Expand selected subtree                     |
+| `]`           | Collapse selected subtree                   |
+| `Space`       | Select node and show in configuration panel |
+| `q` / `ESC`   | Quit application                            |
+| `s`           | Save changes (when in editing mode)         |
 
 ### Configuration Discovery
 
@@ -98,38 +98,40 @@ OpenCode uses a JSON configuration file to define providers, models, and variant
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
-  "model": "anthropic/claude-sonnet-4-5-20250929",
-  "provider": {
-    "anthropic": {
-      "models": {
-        "claude-sonnet-4-5-20250929": {
-          "variants": {
-            "high-thinking": {
-              "options": {
-                "thinking": {
-                  "type": "enabled",
-                  "budgetTokens": 16000
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+	"$schema": "https://opencode.ai/config.json",
+	"model": "anthropic/claude-sonnet-4-5-20250929",
+	"provider": {
+		"anthropic": {
+			"models": {
+				"claude-sonnet-4-5-20250929": {
+					"variants": {
+						"high-thinking": {
+							"options": {
+								"thinking": {
+									"type": "enabled",
+									"budgetTokens": 16000
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
 ```
 
 ### Model Parameters
 
 #### Anthropic Models
+
 - `thinking.type`: `"enabled"` or `"disabled"`
 - `thinking.budgetTokens`: Integer (1-200000)
 - `temperature`: Float (0.0-1.0)
 - `max_tokens`: Integer
 
 #### OpenAI Models
+
 - `reasoningEffort`: `"low"`, `"medium"`, or `"high"`
 - `textVerbosity`: `"low"` or `"high"`
 - `reasoningSummary`: `"auto"` or `"none"`
@@ -137,6 +139,7 @@ OpenCode uses a JSON configuration file to define providers, models, and variant
 - `max_tokens`: Integer
 
 #### Generic Parameters
+
 - `temperature`: Controls randomness (model-dependent range)
 - `max_tokens`: Maximum output tokens
 
@@ -213,33 +216,9 @@ cargo clippy
 - `OC_VARIANCE_CACHE` - Path to custom cache directory
 - `NO_COLOR` - Disable colored output
 
-## Roadmap
+# Administration
 
-See [issue tracker](https://github.com/rektide/rekon/issues) for detailed progress.
-
-- [x] Phase 1: Project Setup & Structure
-- [x] Phase 2: models.dev Integration with Caching
-- [x] Phase 3: Configuration Management
-- [ ] Phase 4: Core Data Structures
-- [ ] Phase 5: Basic UI Framework
-- [ ] Phase 6: Configuration Panel
-- [ ] Phase 7: CRUD Operations
-- [ ] Phase 8: Testing & Quality
-- [ ] Phase 9: Advanced Features
-
-## Contributing
-
-Contributions are welcome! Please read our contributing guidelines and submit pull requests to [rektide/rekon](https://github.com/rektide/rekon/pulls).
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-Distributed under the terms of both the MIT license and the Apache License, Version 2.0.
+Distributed under the MIT license and the Apache License, Version 2.0.
 
 See [LICENSE-MIT](../../LICENSE-MIT) and [LICENSE-APACHE](../../LICENSE-APACHE) files for details.
 
@@ -250,8 +229,3 @@ See [LICENSE-MIT](../../LICENSE-MIT) and [LICENSE-APACHE](../../LICENSE-APACHE) 
 - [clap](https://github.com/clap-rs/clap) - Command-line argument parser
 - [models.dev](https://models.dev/) - Model information API
 - [Rust CLI Guide](../prompt/rust-cli.md) - Best practices for CLI development
-
-## Related Projects
-
-- [rekon](../) - Main rekon project
-- [provider/opencode-model-config.json](../provider/opencode-model-config.json) - Example OpenCode configuration
