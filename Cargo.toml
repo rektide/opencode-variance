@@ -1,0 +1,61 @@
+[package]
+name = "oc-variance"
+version = "0.1.0"
+edition = "2021"
+description = "Interactive TUI for OpenCode model configuration and variance"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/rektide/rekon"
+authors = ["Rektide"]
+
+[[bin]]
+name = "oc-variance"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.5", features = ["derive", "cargo", "env", "unicode", "wrap_help", "string"] }
+clap_complete = "4.5"
+
+# TUI framework
+ratatui = "0.26"
+crossterm = "0.27"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# User interaction
+dialoguer = "0.11"
+indicatif = "0.17"
+console = "0.15"
+colored = "2.1"
+
+# HTTP client (blocking, no tokio needed)
+ureq = "2.9"
+
+# Configuration and cache directories
+directories = "5.0"
+config = "0.14"
+
+# Time handling for cache freshness
+chrono = { version = "0.4", features = ["serde"] }
+
+# Filesystem operations
+fs-lock = "0.1"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+tempfile = "3.10"
+insta = { version = "1.38", features = ["yaml", "json"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+opt-level = "z"
