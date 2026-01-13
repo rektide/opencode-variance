@@ -1,5 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
+use clap::CommandFactory;
+use clap_complete::generate;
 use directories::ProjectDirs;
 
 mod cli;
@@ -27,5 +29,9 @@ fn main() -> Result<()> {
         cli::Commands::Interactive => ui::run_interactive(config_dir, cache_dir),
         cli::Commands::FetchModels => models::fetch_models(config_dir, cache_dir),
         cli::Commands::Validate => config::validate(config_dir),
+        cli::Commands::Completions { shell } => {
+            generate(shell, &mut cli::Cli::command(), "oc-variance", &mut std::io::stdout());
+            Ok(())
+        }
     }
 }

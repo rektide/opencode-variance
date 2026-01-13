@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use clap_complete::Shell;
 
 #[derive(Parser)]
 #[command(
@@ -11,7 +12,7 @@ use clap::{Parser, Subcommand};
 )]
 pub struct Cli {
     /// Path to opencode.json configuration file
-    #[arg(short, long, global = true, env = "OPENCODE_CONFIG")]
+    #[arg(short = 'C', long, global = true, env = "OPENCODE_CONFIG")]
     pub config: Option<std::path::PathBuf>,
 
     /// Path to cache directory (default: XDG cache directory)
@@ -36,4 +37,12 @@ pub enum Commands {
 
     /// Validate current opencode.json configuration
     Validate,
+
+    /// Generate shell completions
+    #[command(arg_required_else_help = true)]
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
 }

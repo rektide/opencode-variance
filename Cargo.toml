@@ -52,7 +52,6 @@ assert_cmd = "2.0"
 predicates = "3.1"
 tempfile = "3.10"
 insta = { version = "1.38", features = ["yaml", "json"] }
-nextest = "0.9"
 
 [profile.release]
 lto = true
