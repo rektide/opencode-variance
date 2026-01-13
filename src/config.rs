@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
+use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -32,15 +34,116 @@ pub struct OpenCodeConfig {
 
 pub type ProviderConfigMap = serde_json::Map<String, serde_json::Value>;
 
-/// Load and validate OpenCode configuration
+/// Load and validate OpenCode configuration with layered merging
 pub fn load_config(config_dir: &Path, cli_path: Option<&Path>) -> Result<OpenCodeConfig> {
-    let config_path = find_config_path(config_dir, cli_path)?;
+    let mut merged_config = serde_json::Map::new();
 
-    let contents = fs::read_to_string(&config_path)
-        .with_context(|| format!("Failed to read config: {}", config_path.display()))?;
+    // Priority 1: System-wide config (optional)
+    if let Some(system_config) = find_system_config() {
+        if system_config.exists() {
+            println!("Loading system config: {}", system_config.display());
+            let contents = fs::read_to_string(&system_config)
+                .with_context(|| format!("Failed to read system config: {}", system_config.display()))?;
+            if let Ok(config) = serde_json::from_str::<Value>(&contents) {
+                if let Some(obj) = config.as_object() {
+                    for (key, value) in obj {
+                        merged_config.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+        }
+    }
 
-    let config: OpenCodeConfig = serde_json::from_str(&contents)
-        .with_context(|| format!("Invalid JSON in config: {}", config_path.display()))?;
+    // Priority 2: User config directory (optional)
+    if let Some(user_config) = find_user_config() {
+        if user_config.exists() {
+            println!("Loading user config: {}", user_config.display());
+            let contents = fs::read_to_string(&user_config)
+                .with_context(|| format!("Failed to read user config: {}", user_config.display()))?;
+            if let Ok(config) = serde_json::from_str::<Value>(&contents) {
+                if let Some(obj) = config.as_object() {
+                    for (key, value) in obj {
+                        merged_config.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    // Priority 3: Current directory config (optional)
+    let cwd_config = PathBuf::from("./opencode.json");
+    if cwd_config.exists() {
+        println!("Loading local config: {}", cwd_config.display());
+        let contents = fs::read_to_string(&cwd_config)
+            .with_context(|| format!("Failed to read local config: {}", cwd_config.display()))?;
+        if let Ok(config) = serde_json::from_str::<Value>(&contents) {
+            if let Some(obj) = config.as_object() {
+                for (key, value) in obj {
+                    merged_config.insert(key.clone(), value.clone());
+                }
+            }
+        }
+    }
+
+    // Priority 4: Environment variable for config path (optional)
+    if let Ok(env_path) = std::env::var("OPENCODE_CONFIG") {
+        let env_path_buf = PathBuf::from(&env_path);
+        if env_path_buf.exists() {
+            println!("Loading env config: {}", env_path_buf.display());
+            let contents = fs::read_to_string(&env_path_buf)
+                .with_context(|| format!("Failed to read env config: {}", env_path_buf.display()))?;
+            if let Ok(config) = serde_json::from_str::<Value>(&contents) {
+                if let Some(obj) = config.as_object() {
+                    for (key, value) in obj {
+                        merged_config.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    // Priority 5: CLI-specified config path (highest priority)
+    if let Some(cli_path) = cli_path {
+        if !cli_path.exists() {
+            return Err(anyhow::anyhow!(
+                "CLI-specified config file not found: {}",
+                cli_path.display()
+            ));
+        }
+        println!("Loading CLI config: {}", cli_path.display());
+        let contents = fs::read_to_string(cli_path)
+            .with_context(|| format!("Failed to read CLI config: {}", cli_path.display()))?;
+        if let Ok(config) = serde_json::from_str::<Value>(&contents) {
+            if let Some(obj) = config.as_object() {
+                for (key, value) in obj {
+                    merged_config.insert(key.clone(), value.clone());
+                }
+            }
+        }
+    } else {
+        // If no CLI path and no configs found, use config_dir default
+        let config_dir_config = config_dir.join("opencode.json");
+        if config_dir_config.exists() {
+            println!("Loading default config: {}", config_dir_config.display());
+            let contents = fs::read_to_string(&config_dir_config)
+                .with_context(|| format!("Failed to read default config: {}", config_dir_config.display()))?;
+            if let Ok(config) = serde_json::from_str::<Value>(&contents) {
+                if let Some(obj) = config.as_object() {
+                    for (key, value) in obj {
+                        merged_config.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+        } else if merged_config.is_empty() {
+            // Return default config if no files found
+            return Ok(OpenCodeConfig::default());
+        }
+    }
+
+    // Convert merged config to OpenCodeConfig
+    let merged_value = Value::Object(merged_config);
+    let config: OpenCodeConfig = serde_json::from_value(merged_value)
+        .with_context(|| "Merged configuration does not match OpenCode schema")?;
 
     validate_config(&config)?;
 
@@ -60,37 +163,34 @@ pub fn save_config(config_dir: &Path, config: &OpenCodeConfig) -> Result<()> {
     Ok(())
 }
 
-/// Find the appropriate config file path
-fn find_config_path(config_dir: &Path, cli_path: Option<&Path>) -> Result<PathBuf> {
-    // 1. CLI-specified path has highest priority
-    if let Some(path) = cli_path {
-        if !path.exists() {
-            return Err(anyhow::anyhow!(
-                "Config file not found: {}",
-                path.display()
-            ));
+/// Find system-wide configuration file
+/// Checks /etc/oc-variance/opencode.json and /etc/opencode.json
+fn find_system_config() -> Option<PathBuf> {
+    let paths = [
+        "/etc/oc-variance/opencode.json",
+        "/etc/opencode.json",
+    ];
+
+    for path in paths {
+        let path_buf = PathBuf::from(path);
+        if path_buf.exists() {
+            return Some(path_buf);
         }
-        return Ok(path.to_path_buf());
     }
 
-    // 2. Config directory
-    let config_path = config_dir.join("opencode.json");
-    if config_path.exists() {
-        return Ok(config_path);
+    None
+}
+
+/// Find user configuration file following XDG spec
+fn find_user_config() -> Option<PathBuf> {
+    if let Some(proj_dirs) = ProjectDirs::from("org", "rekon", "oc-variance") {
+        let user_config = proj_dirs.config_dir().join("opencode.json");
+        if user_config.exists() {
+            return Some(user_config);
+        }
     }
 
-    // 3. Current directory
-    let cwd_config = PathBuf::from("opencode.json");
-    if cwd_config.exists() {
-        return Ok(cwd_config);
-    }
-
-    Err(anyhow::anyhow!(
-        "No opencode.json found. \
-         Expected location: {} or ./opencode.json. \
-         Use --config to specify a path.",
-        config_path.display()
-    ))
+    None
 }
 
 /// Validate configuration
@@ -122,7 +222,7 @@ fn validate_config(config: &OpenCodeConfig) -> Result<()> {
 fn validate_model_config(
     provider: &str,
     model: &str,
-    config: &serde_json::Value,
+    config: &Value,
 ) -> Result<()> {
     // Check variants if present
     if let Some(variants) = config.get("variants") {
@@ -153,18 +253,18 @@ fn validate_thinking_config(
     provider: &str,
     model: &str,
     variant: &str,
-    thinking: &serde_json::Value,
+    thinking: &Value,
 ) -> Result<()> {
     if let Some(type_) = thinking.get("type") {
         let _type_str = type_.as_str().unwrap_or("disabled");
 
         if type_.as_str().unwrap_or("disabled") == "enabled" {
-            if let Some(budget) = thinking.get("budget_tokens") {
+            if let Some(budget) = thinking.get("budgetTokens") {
                 let budget_value = budget.as_u64().unwrap_or(0);
 
                 if budget_value == 0 {
                     return Err(anyhow::anyhow!(
-                        "Variant '{}/{}:{}' has enabled thinking but budget_tokens is 0. \
+                        "Variant '{}/{}:{}' has enabled thinking but budgetTokens is 0. \
                          Set a positive value.",
                         provider, model, variant
                     ));
@@ -185,8 +285,8 @@ fn validate_thinking_config(
 }
 
 /// Validate current configuration without modifying it
-pub fn validate(config_dir: &Path) -> Result<()> {
-    let _config = load_config(config_dir, None)?;
+pub fn validate(config_dir: &Path, cli_path: Option<&Path>) -> Result<()> {
+    let _config = load_config(config_dir, cli_path)?;
     println!("Configuration is valid");
     Ok(())
 }

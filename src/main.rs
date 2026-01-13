@@ -28,7 +28,10 @@ fn main() -> Result<()> {
     match cli.command {
         cli::Commands::Interactive => ui::run_interactive(config_dir, cache_dir),
         cli::Commands::FetchModels => models::fetch_models(config_dir, cache_dir),
-        cli::Commands::Validate => config::validate(config_dir),
+        cli::Commands::Validate => {
+            let cli_path = cli.config.as_deref().map(|p| p.as_ref());
+            config::validate(config_dir, cli_path)
+        }
         cli::Commands::Completions { shell } => {
             generate(shell, &mut cli::Cli::command(), "oc-variance", &mut std::io::stdout());
             Ok(())
